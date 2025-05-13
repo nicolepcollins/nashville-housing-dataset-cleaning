@@ -1,0 +1,236 @@
+---
+title: "Data Cleaning of Nashville Housing Dataset for Analysis and Modeling"
+author: "Nicole Collins"
+date: "2025-05-13"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    theme: spacelab
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+![Nashville Skyline](nashville_skyline.png){width=100%}
+
+*Image source: Getty Images – Kruck20 / gettyimages.com*
+
+## Introduction
+
+In this project, I demonstrate my data cleaning skills by processing the [Nashville Housing dataset](https://www.kaggle.com/datasets/tmthyjames/nashville-housing-data), which contains property sale records from 2013-2016. The goal is to prepare the dataset for detailed analysis, ensuring its quality and reliability for predictive modeling.
+
+[Click here for Data License](https://creativecommons.org/publicdomain/zero/1.0/)
+
+## Step 1: Load Libraries and Dataset
+
+In this section, I load the required libraries and import the Nashville Housing dataset. This step ensures the data is ready for inspection and subsequent cleaning. I also perform an initial structure check to understand the shape and type of data I'll be working with.
+
+```{r load essential libraries}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Load required libraries
+library(tidyverse)   # for data manipulation and visualization
+library(lubridate)   # for working with date formats
+library(janitor)     # for cleaning column names quickly
+library(visdat)      # for visualizing missing data
+
+# Load the dataset
+nashville <- read_csv("Nashville_housing_data_2013_2016.csv")
+
+# Preview structure of the dataset
+glimpse(nashville)
+
+# Summary statistics for numerical columns
+summary(nashville)
+
+```
+
+## Step 2: Clean Column Names
+
+This section focuses on standardizing column names to ensure they follow consistent naming conventions. I’ll use the janitor package to clean the column names into a clear, readable format, making the dataset easier to work with in subsequent steps.
+
+```{r clean column names}
+# Clean column names using janitor's clean_names() function
+nashville <- janitor::clean_names(nashville)
+
+# Preview the cleaned column names
+colnames(nashville)
+
+```
+
+## Step 3: Handle Missing Values
+
+In this section, I'll identify any missing values in the dataset. Handling missing data is essential to ensuring the integrity and completeness of the analysis. Depending on the situation, I may choose to impute, drop, or flag rows/columns with missing values.
+
+```{r handle missing values}
+# Check for missing values in the dataset
+colSums(is.na(nashville))
+
+# Take a random sample of 500 rows to visualize
+library(dplyr)
+nashville_sample <- slice_sample(nashville, n = 500)
+
+# Now visualize missing data
+vis_miss(nashville_sample)
+
+# Decide how to handle missing data
+# For example, I may drop rows where essential variables like SalePrice are missing
+nashville_cleaned <- nashville %>%
+  filter(!is.na(sale_price))  # Removing rows where sale_price is NA
+```
+
+```{r identify missing data}
+# Summary of dataset to identify columns with missing data
+summary(nashville_cleaned)
+```
+
+```{r handle missing data}
+# Handling missing data by replacing NAs with appropriate values
+
+nashville_cleaned <- nashville_cleaned %>%
+  mutate(
+    # Replace missing sale_price with the median value
+    sale_price = ifelse(is.na(sale_price), median(sale_price, na.rm = TRUE), sale_price),
+    
+    # Replace missing owner_name with "Unknown"
+    owner_name = ifelse(is.na(owner_name), "Unknown", owner_name)
+  )
+```
+
+```{r visualize missing data}
+# Visualize missing data after handling
+
+# Downsample to 10,000 rows for visualization
+nashville_sampled <- nashville_cleaned %>%
+  slice_sample(n = 10000)
+
+# Visualize missing data in the downsampled dataset
+vis_miss(nashville_sampled)
+```
+```
+
+##  Step 4: Confirm Date Format
+
+The sale_date column is already properly formatted as a Date object, which is ideal for time-based analysis. This step confirms that no additional transformation is needed.
+
+```{r convert dates}
+# Confirm the format of the sale_date column
+head(nashville$sale_date)
+class(nashville$sale_date)
+
+# Assign the already-clean date column to the cleaned dataset
+nashville_cleaned <- nashville_cleaned %>%
+  mutate(sale_date = nashville$sale_date)
+```
+
+##  Step 5: Standardize Text Fields
+
+In this step, I clean and standardize inconsistent text fields such as property types or ownership names. This prevents grouping issues during analysis and ensures accuracy in aggregations or filters.
+
+```{r standardize text fields}
+# Standardize text fields with appropriate cleaning
+nashville_cleaned <- nashville_cleaned %>%
+  mutate(
+    # Standardizing 'land_use' field: Capitalize first letter of each word
+    land_use = str_to_title(str_trim(land_use)),  
+    
+    # Standardizing 'owner_name': Proper capitalization
+    owner_name = str_to_title(str_trim(owner_name)),  
+    
+    # Removing extra spaces from property address and standardizing case
+    property_address = str_to_title(str_trim(property_address)),
+    property_city = str_to_title(str_trim(property_city)),
+    
+    # Capitalizing tax district and foundation type
+    tax_district = str_to_title(str_trim(tax_district)),
+    foundation_type = str_to_title(str_trim(foundation_type))
+  )
+```
+
+
+## Step 6: Outlier Detection
+
+Outliers are values that deviate significantly from other observations. Detecting and handling outliers is important for ensuring the accuracy of your analysis.
+
+```{r identify outliers}
+# Boxplot to identify potential outliers in sale_price and acreage
+library(ggplot2)
+
+# Remove rows with NA or infinite values for the relevant columns
+nashville_cleaned <- nashville_cleaned %>%
+  filter(!is.na(sale_price) & !is.na(acreage)) %>%
+  filter(is.finite(sale_price) & is.finite(acreage))
+
+# Plot the boxplot for sale_price
+ggplot(nashville_cleaned, aes(x = sale_price)) +
+  geom_boxplot(fill = "#69b3a2", color = "#404040", outlier.colour = "#D55E00", outlier.size = 2) +
+  ggtitle("Boxplot for Sale Price") +
+  xlab("Sale Price") +
+  ylab("Frequency") +
+  theme_minimal(base_size = 15) + # Clean minimal theme
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12)
+  )
+
+# Plot the boxplot for acreage
+ggplot(nashville_cleaned, aes(x = acreage)) +
+  geom_boxplot(fill = "#69b3a2", color = "#404040", outlier.colour = "#D55E00", outlier.size = 2) +
+  ggtitle("Boxplot for Acreage") +
+  xlab("Acreage") +
+  ylab("Frequency") +
+  theme_minimal(base_size = 15) + # Clean minimal theme
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12)
+  )
+
+```
+
+```{r removing outliers}
+# Removing outliers
+nashville_cleaned <- nashville_cleaned %>%
+  filter(sale_price < 10000000)  # Remove properties above $10 million
+
+# Outlier detection using boxplot for sale_price
+ggplot(nashville_cleaned, aes(x = sale_price)) +
+  geom_boxplot(fill = "#69b3a2", color = "#404040", outlier.colour = "#D55E00", outlier.size = 2) +
+  ggtitle("Boxplot for Sale Price") +
+  xlab("Sale Price") +
+  ylab("Frequency") +
+  theme_minimal(base_size = 15) + # Clean minimal theme
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12)
+  )
+```
+
+## Conclusion
+
+In this project, I demonstrated key data cleaning techniques that are critical in preparing a dataset for analysis. Through the following steps, I ensured that the Nashville Housing dataset was well-prepared for further analysis:
+
+-   Cleaning column names for consistency and readability using the janitor package.
+
+-   Handling missing data by identifying and replacing NAs, ensuring that the dataset was complete and could be used effectively in further analysis.
+
+-   Standardizing text fields such as addresses and owner names to prevent inconsistencies and errors during analysis.
+
+-   Outlier detection and removal to ensure that extreme values did not distort the dataset and influence results.
+
+By performing these steps, I not only cleaned and organized the data but also prepared it for more detailed analyses, such as exploring trends in housing prices, property features, and regional patterns.
+
+The next steps in this analysis would involve further exploration of the cleaned data, including generating descriptive statistics, visualizing key trends, and possibly building predictive models to forecast housing prices. Additionally, performing geographic analyses could provide insights into how location affects property values.
+
+This data cleaning process is crucial as it lays the foundation for reliable, actionable insights. The cleaned dataset is now ready for any further analysis or modeling required to gain deeper insights into the Nashville housing market.
+
+## Exporting
+```{r exporting}
+# Export the cleaned dataset to a CSV file
+write_csv(nashville_cleaned, "nashville_cleaned.csv")
+```
+
