@@ -12,7 +12,7 @@ I used R and packages like `tidyverse`, `janitor`, and `lubridate` to clean, tra
 - Outlier detection and removal
 
 ## 🔗 View Project on RPubs
-[Click here to view the full project](https://rpubs.com/your-username/nashville-cleaning](https://rpubs.com/nicolepcollins/Nashville-housing-dataset-cleaning)
+[Click here to view the full project](https://rpubs.com/your-username/nashville-cleaning)
 
 ## 📁 Files Included
 - `nashville_cleaning.Rmd`: Source code for the project
